@@ -283,5 +283,65 @@ _processPendingState的实现:
   },
 ```
 因为设置和替换state使用同一个队列，所以有个条件逻辑判断state是否正在被替换。如果是替换，挂起的state会和替换的state合并。如果不是替换的话，挂起的state则和当前的state合并。还有一个条件判断设置state的风格 —— setState的第一个参数可以是object也可以是个function，在处理挂起的state的时候会判断一下。调用replaceState更新全部之前的state，所以被替换的state都在队列的最前面。
+## ReactUpdates.asap
+
+ReactUpdate有个最重要的特性之前还没展开，就是ReactUpdate中的asap:
+
+```javascript
+function asap(callback, context) {
+  invariant(
+    batchingStrategy.isBatchingUpdates,
+    'ReactUpdates.asap: Can\'t enqueue an asap callback in a context where' +
+    'updates are not being batched.'
+  );
+  asapCallbackQueue.enqueue(callback, context);
+  asapEnqueued = true;
+}
+```
+
+在ReactUpdates的flushBatchedUpdates中用过:
+
+```javascript
+var flushBatchedUpdates = function() {
+  // ReactUpdatesFlushTransaction's wrappers will clear the dirtyComponents
+  // array and perform any updates enqueued by mount-ready handlers (i.e.,
+  // componentDidUpdate) but we need to check here too in order to catch
+  // updates enqueued by setState callbacks and asap calls.
+  while (dirtyComponents.length || asapEnqueued) {
+    if (dirtyComponents.length) {
+      var transaction = ReactUpdatesFlushTransaction.getPooled();
+      transaction.perform(runBatchedUpdates, null, transaction);
+      ReactUpdatesFlushTransaction.release(transaction);
+    }
+
+    if (asapEnqueued) {
+      asapEnqueued = false;
+      var queue = asapCallbackQueue;
+      asapCallbackQueue = CallbackQueue.getPooled();
+      queue.notifyAll();
+      CallbackQueue.release(queue);
+    }
+  }
+};
+```
+
+这个仅仅在更新react中的input元素的时候被使用，来避免一些问题。调用回掉函数的策略基本是这样工作的:在全部更新之后，即使只捕捉到一个。asap使得当前的更新结束之后立即回调的调用 —— 所以当更新被捕捉到之后，他们需要等待asap的回调运行结束。
+
+## 概要回顾
+
+set state是一个很长的处理,其中包括了:
+
++ 调用setState将挂起的state变更塞入ReactUpdateQueue队列。
++ ReactUpdateQueue给组件内部的实例增加了额外的挂起state的入口，调用ReactUpdates执行他的任务。
++ ReactUpdates使用batchingStrategy确保所有的state的变更在事务中执行 —— 保证所有的更新都被应用。
++ flushBatchedUpdates负责按顺序地原子操作更新
++ ReactUpdatesFlushTransaction保证了捕获的更新都被适当的处理。
++ runBatchedUpdates负责将各种更新按照从父组件到子组件的顺序排序，并且调用ReactReconciler来更新组件。
++ performUpdateIfNecessary 负责检查是props的变化还是state的变化，然后调用updateComponent收集全部的变化。
++ updateComponent有区分更新类型的逻辑，然后检查是否有shouldComponentUpdate方法 —— 可能会停止虚拟DOM的更新。他还会按需调用组件生命周期中的各种方法(shouldComponentUpdate, componentWillReceiveProps, componentWillUpdate, componentDidUpdate)。
++ _processPendingState是有关将state的变更应用到组件上的。他可以区分state是设置还是替换，同时也能区分setState中第一个参数的类型(object还是function)。
++ asap是被用在input元素上，用来解决在调和阶段的一些小问题 —— 当前的更新执行完之后立即调用。
+
+什么是你确定能从setState中取到的？
 
 [原文链接](http://reactkungfu.com/2016/03/dive-into-react-codebase-handling-state-changes)
