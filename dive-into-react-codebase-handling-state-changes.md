@@ -23,22 +23,25 @@ state是React.js术语中最复杂的概念之一。
   // ...
 ```
 
-但是上面的并没有其作用。为什么？因为setState生效是异步的。这说明当调用setState之后变量this.state没有立即变化。在文档的“注意”章节中有描述：
-```
-setState()不会立即改变this.state而是生成一个挂起的state事务。在调用完之后马上获取this.state可能会返回之前的值。
-```
-这不是一个怪异的情况，而是对setState的误解或是相关知识的欠缺。
-Robert可以通过阅读文档来避免他的错误。
-但是你不得不承认这是初学者很容易犯的错误。
+但是上面的并没有其作用。为什么？因为setState生效是异步的。这说明当调用setState之后变量this.state没有立即变化。在文档的“注意”章节中有描述：
 
-以上的情况引发了队伍内部有趣的讨论。你预期从setState中获取什么？你一定能获取什么？如果你改变了输入框地值并且立即点击了提交按钮，为什么你能确保stateli将被正确地更新？我决定跟踪当你调用setState之后背后发生的变化，为了理解后续将发生什么，并开始一段有趣的React内部之旅，。但是首先我们用个合适的方法来解决Robert的问题。
+```
+  setState()不会立即改变this.state而是生成一个挂起的state事务。在调用完之后马上获取this.state可能会返回之前的值。
+```
+
+这不是一个怪异的情况，而是对setState的误解或是相关知识的欠缺。
+Robert可以通过阅读文档来避免他的错误。
+但是你不得不承认这是初学者很容易犯的错误。
+
+以上的情况引发了队伍内部有趣的讨论。你预期从setState中获取什么？你一定能获取什么？如果你改变了输入框地值并且立即点击了提交按钮，为什么你能确保stateli将被正确地更新？我决定跟踪当你调用setState之后背后发生的变化，为了理解后续将发生什么，并开始一段有趣的React内部之旅。但是首先我们用个合适的方法来解决Robert的问题。
 
 ## 解决验证问题
 
-我们一起看看在React 0.14.7中有什么其他选项可以解决上述的问题。
+我们一起看看在React 0.14.7中有什么其他选项可以解决上述的问题。
 
-你可以使用setState内嵌的callback的能力。setState接受两个参数——第一个是state的变化值，第二个是callback，当state更新完成之后会调用callback：
-```
+你可以使用setState内嵌的callback的能力。setState接受两个参数——第一个是state的变化值，第二个是callback，当state更新完成之后会调用callback：
+
+```javascript
 changeTitle: function changeTitle (event) {
   this.setState({ title: event.target.value }, function afterTitleChange () {
     this.validateTitle();
@@ -46,11 +49,12 @@ changeTitle: function changeTitle (event) {
 },
 // ...
 ```
-afterTitleChange中state已经更新完了，所以你能确保this.state中取到的是最新值。
+afterTitleChange中state已经更新完了，所以你能确保this.state中取到的是最新值。
 
 
-+ 你可以合并state的变更,为了合并你必须将validateTitle参数化，将两次state的更新合并成一次：
-```
++ 你可以合并state的变更,为了合并你必须将validateTitle参数化，将两次state的更新合并成一次：
+
+```javascript
   changeTitle: function changeTitle (event) {
     let nextState = Object.assign({},
                                   this.state,
@@ -64,9 +68,10 @@ afterTitleChange中state已经更新完了，所以你能确保this.state中取
     }
   }
 ```
-Robert的问题解决了，因为没有更新state两次。当你state变得越来越大并且是嵌套的这就会变的复杂起来（这不是一个很好的实践！）。
-把validateTitle变成一个纯函数——函数的返回值只依赖于传入的参数并且他不会改变其他任何东西，也是个不错的解决办法：
-```
+Robert的问题解决了，因为没有更新state两次。当你state变得越来越大并且是嵌套的这就会变的复杂起来（这不是一个很好的实践！）。
+把validateTitle变成一个纯函数——函数的返回值只依赖于传入的参数并且他不会改变其他任何东西，也是个不错的解决办法：
+
+```javascript
   changeTitle: function changeTitle (event) {
     let nextState = Object.assign({},
                                   this.state,
@@ -81,15 +86,15 @@ Robert的问题解决了，因为没有更新state两次。当你state变得�
     return Object.assign({}, state, validation);
   }
 ```
-和之前的方法相比，这可能会更浪费性能。幸亏可以配置shouldComponentUpdate，如果有自定义的shouldComponentUpdate，一些state的更新可以忽略就不会触发componentDidUpdate，因此validateTitle也不会被调用。
+和之前的方法相比，这可能会更浪费性能。幸亏可以配置shouldComponentUpdate，如果有自定义的shouldComponentUpdate，一些state的更新可以忽略就不会触发componentDidUpdate，因此validateTitle也不会被调用。
 
- + 你也可以将state抽离出来，把验证放在app的其他部分（例如Redux中的reducer）。通过完全不使用state的方式来避免React层面的问题。
+ + 你也可以将state抽离出来，把验证放在app的其他部分（例如Redux中的reducer）。通过完全不使用state的方式来避免React层面的问题。
 
 书中Robert采用了将state合并到一起的解决方法（上面的第二种）。这趟冒险让他更加坚信了要把state放到react的component之外，从而可以避免考虑他们。但这是有效的方法来抵制state？我们一起往下看。。
 
 *如果你想跳过react代码一步一步的详解，你可以直接跳到回顾章节*
 
-## 深入React——在兔子洞穴之下
+## 深入React——在兔子洞穴之下
 
 setState被定义在ReactComponent的prototype上，ReactComponent是React.Component类，使用ES2015类的定义React组件的时候都会继承React.Component。
 通过React.createClass创建的组件都能使用setState，而且是同样的代码。React.createClass返回组件的prototype都是ReactClassComponent，
@@ -130,13 +135,13 @@ setState被定义在ReactComponent的prototype上，ReactComponent是React.Compo
 };
 ```
 
-除了检查非变量和有警告的issue，这做了两件事情：
+除了检查非变量和有警告的issue，这做了两件事情：
 
-+ setState被塞进update的队列来做他的工作。
++ setState被塞进update的队列来做他的工作。
 
-+ 如果存在callback，它作为setState的第二个参数被塞进队列。晚些你会明白这么做的原因。
++ 如果存在callback，它作为setState的第二个参数被塞进队列。晚些你会明白这么做的原因。
 
-但是什么是updater？这名字暗示了他和更新组件有些联系。让我们看下他在ReactClass和ReactComponent哪儿被定义的：
+但是什么是updater？这名字暗示了他和更新组件有些联系。让我们看下他在ReactClass和ReactComponent哪儿被定义的：
 
 ```javascript
   // We initialize the default updater but the real one gets injected by the
@@ -146,7 +151,7 @@ setState被定义在ReactComponent的prototype上，ReactComponent是React.Compo
 
 React.js源码重度依赖依赖注入原则。
 这样允许根据不同的环境(服务端VS客户端，不同的平台)，可以替换React.js的某些部分。
-ReactComponent是同构命名空间的一部分——无论在React Native，浏览器上的ReactDOM或者是服务端，都有ReactComponent。
+ReactComponent是同构命名空间的一部分——无论在React Native，浏览器上的ReactDOM或者是服务端，都有ReactComponent。
 他仅包含纯的JavaScript代码，这样可以保证他能够运行在所有可以解析ES5标准的js的设备。
 
 所以真正的updater在哪儿被注入？在ReactCompositeComponent的renderer部分（mountComponent方法）：
@@ -158,10 +163,10 @@ ReactComponent是同构命名空间的一部分——无论在React Native，
   inst.refs = emptyObject;
   inst.updater = ReactUpdateQueue;
 ```
-ReactCompositeComponent类被用到各种React中（react-dom, react-native, react-art）来构建一个存在于每个React组件中不依赖环境的基础。
-这是使用事务的先决条件，例如react-dom客户端中的ReactMount——依赖于平台的代码在这里运行然后包上保证不依赖于平台的内部正确的事务。
+ReactCompositeComponent类被用到各种React中（react-dom, react-native, react-art）来构建一个存在于每个React组件中不依赖环境的基础。
+这是使用事务的先决条件，例如react-dom客户端中的ReactMount —— 依赖于平台的代码在这里运行然后包上保证不依赖于平台的内部正确的事务。
 
-既然明白了什么是updater，我们看下enqueueSetState和enqueueCallback是如何实现的。
+既然明白了什么是updater，我们看下enqueueSetState和enqueueCallback是如何实现的。
 
 ## 把state的更新和callback都放入队列 —— ReactUpdateQueue
 
@@ -710,5 +715,18 @@ set state是一个很长的处理,其中包括了:
 + asap是被用在input元素上，用来解决在调和阶段的一些小问题 —— 当前的更新执行完之后立即调用。
 
 什么是你确定能从setState中取到的？
+
+## 一些确定的东西
+
++ 可以保证state的更新是按顺序的。这意味着先设置{ a:2 }，再设置{ a:3 }，最终结果state中a的值是3。
++ 同一context下调用两次setState，不能保证会更新DOM两次。事实上这是不可能的。
++ 不能保证调用setState之后state立即就被刷新。必须使用setState的回调函数(第二个参数)或者在组件的生命周期中使用state(componentDidUpdate)。
++ 可以确保callback的调用是按顺序的。
++ 不能保证setState中的callback执行时，state中的值正好就是第一个参数中的值。例如setState({ a:2 }, callback1), setState({ a:3 }, callback2)的时候，当运行callback1的时候，state中的a可能已经是3了。
++ 可以确保在你处理下个事件之前时，state的更新已经执行完毕了。ReactReconcileTransaction中的EVENT_SUPPRESSION wrapper会处理这个问题。
+
+## 总结
+
+跟踪setState如何工作，是展示react源码中如何运用事务的。洞察到像管理同步流程一样管理这些异步的流程。由里及表的了解到React是如何实现的，同时在未来可能会避免一些明显的问题，会让你成为一个更好的React程序员。这不是很酷，也是你所好奇的？
 
 [原文链接](http://reactkungfu.com/2016/03/dive-into-react-codebase-handling-state-changes)
