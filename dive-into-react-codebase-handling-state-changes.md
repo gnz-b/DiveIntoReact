@@ -1,9 +1,11 @@
 # 深入React源码：处理state的变化
+[原文链接](http://reactkungfu.com/2016/03/dive-into-react-codebase-handling-state-changes)
+
 state是React.js术语中最复杂的概念之一。
 虽然我们在项目中通过集中式的方法（Redux或者其他的？）来处理state，但是它任然是React.js中被广泛应用的特性。
 
 使用state带来方便的同时也会带来一些问题。 Rails meets React.js的作者之一，Robert Pankowecki开始React之旅时，
-在做表单验证功能的时候就碰到了问题。
+在做表单验证功能的时候就碰到了问题。
 
 事情是这样的： 验证功能看上去很容易，但是form有个问题用户首次看到的输入框是没有被验证过的，即使该输入框的值是非法的。
 这显然是个stateful的操作，所以Robert得出结论把验证消息放在state中会是一个不错的做法。
@@ -729,4 +731,4 @@ set state是一个很长的处理,其中包括了:
 
 跟踪setState如何工作，是展示react源码中如何运用事务的。洞察到像管理同步流程一样管理这些异步的流程。由里及表的了解到React是如何实现的，同时在未来可能会避免一些明显的问题，会让你成为一个更好的React程序员。这不是很酷，也是你所好奇的？
 
-[原文链接](http://reactkungfu.com/2016/03/dive-into-react-codebase-handling-state-changes)
+
