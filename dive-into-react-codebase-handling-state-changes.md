@@ -2,14 +2,14 @@
 [原文链接](http://reactkungfu.com/2016/03/dive-into-react-codebase-handling-state-changes)
 
 state是React.js术语中最复杂的概念之一。
-虽然我们在项目中通过集中式的方法（Redux或者其他的？）来处理state，但是它任然是React.js中被广泛应用的特性。
+虽然我们在项目中通过集中式的方法（Redux或者其他的？）来处理state，但它任然是React.js中被广泛应用的特性。
 
-使用state带来方便的同时也会带来一些问题。 Rails meets React.js的作者之一，Robert Pankowecki开始React之旅时，
-在做表单验证功能的时候就碰到了问题。
+使用state带来方便的同时也会带来一些问题。Rails meets React.js的作者之一，Robert Pankowecki刚开始使用React时，
+在做表单验证的时候就遇到了问题。
 
-事情是这样的： 验证功能看上去很容易，但是form有个问题用户首次看到的输入框是没有被验证过的，即使该输入框的值是非法的。
+事情是这样的：验证功能看上去很容易，但是form有个问题，用户第一次看到的输入框是无需验证的，即使该输入框的值是非法的。
 这显然是个stateful的操作，所以Robert得出结论把验证消息放在state中会是一个不错的做法。
-所以他实现了基本的逻辑如下：
+所以他实现的基本逻辑如下：
 
 ```javascript
   // ...
@@ -25,7 +25,7 @@ state是React.js术语中最复杂的概念之一。
   // ...
 ```
 
-但是上面的并没有其作用。为什么？因为setState生效是异步的。这说明当调用setState之后变量this.state没有立即变化。在文档的“注意”章节中有描述：
+但是上面的并没有起作用。为什么？因为setState生效是异步的。这说明当调用setState之后变量this.state没有立即变化。在文档的“注意”章节中有描述：
 
 ```
   setState()不会立即改变this.state而是生成一个挂起的state事务。在调用完之后马上获取this.state可能会返回之前的值。
@@ -96,7 +96,7 @@ Robert的问题解决了，因为没有更新state两次。当你state变得越�
 
 *如果你想跳过react代码一步一步的详解，你可以直接跳到回顾章节*
 
-## 深入React——在兔子洞穴之下
+## React的内部构造 —— 深入兔子的洞穴
 
 setState被定义在ReactComponent的prototype上，ReactComponent是React.Component类，使用ES2015类的定义React组件的时候都会继承React.Component。
 通过React.createClass创建的组件都能使用setState，而且是同样的代码。React.createClass返回组件的prototype都是ReactClassComponent，
@@ -111,7 +111,7 @@ setState被定义在ReactComponent的prototype上，ReactComponent是React.Compo
   );
 ```
 
-如上，ReactComponent的prototype在这儿——说明setState从这开始可以使用（只要ReactClassMixin没有做什么奇怪的操作——当然他也没有）。
+如上，ReactComponent的prototype在这儿 —— 说明setState从这开始可以使用（只要ReactClassMixin没有做什么奇怪的操作 —— 当然他也没有）。
 我们来看一下实现：
 
 ```javascript
@@ -153,11 +153,11 @@ setState被定义在ReactComponent的prototype上，ReactComponent是React.Compo
 
 React.js源码重度依赖依赖注入原则。
 这样允许根据不同的环境(服务端VS客户端，不同的平台)，可以替换React.js的某些部分。
-ReactComponent是同构命名空间的一部分——无论在React Native，浏览器上的ReactDOM或者是服务端，都有ReactComponent。
-他仅包含纯的JavaScript代码，这样可以保证他能够运行在所有可以解析ES5标准的js的设备。
+ReactComponent是同构命名空间的一部分 —— 无论在React Native，浏览器上的ReactDOM或者是服务端，都有ReactComponent。
+他仅包含JavaScript代码，这样可以保证他能够运行在所有可以解析ES5标准的js的设备。
 
 所以真正的updater在哪儿被注入？在ReactCompositeComponent的renderer部分（mountComponent方法）：
-```
+```javascript
   // These should be set up in the constructor, but as a convenience for
   // simpler class abstractions, we set them up after the fact.
   inst.props = publicProps;
@@ -166,7 +166,7 @@ ReactComponent是同构命名空间的一部分——无论在React Native，浏
   inst.updater = ReactUpdateQueue;
 ```
 ReactCompositeComponent类被用到各种React中（react-dom, react-native, react-art）来构建一个存在于每个React组件中不依赖环境的基础。
-这是使用事务的先决条件，例如react-dom客户端中的ReactMount —— 依赖于平台的代码在这里运行然后包上保证不依赖于平台的内部正确的事务。
+这是使用事务的先决条件，例如react-dom客户端中的ReactMount —— 依赖于平台的代码在这里运行，包上能够正确设置不依赖于平台内部细节的事务。
 
 既然明白了什么是updater，我们看下enqueueSetState和enqueueCallback是如何实现的。
 
@@ -230,7 +230,7 @@ enqueueCallback: function(publicInstance, callback) {
 },
 ```
 
-两个方法都引用了enqueueUpdate，我们稍后会深入研究。套路类似如下:
+两个方法都引用了enqueueUpdate，我们稍后会深入研究。套路如下:
 
 + 首先取到内部的实例。你代码中的react组件都有一个内部的实例里面放着一些私有的方法。可以通过ReactInstanceMap中getInternalInstanceReadyForUpdate获取这些内部实例。
 + 对内部实例进行修改。当有callback的时候，callback被加入到挂起的callback队列。有state变更的时候，将state的变更插入到挂起的state队列里。
@@ -248,7 +248,7 @@ function enqueueUpdate(internalInstance) {
 
 ## 开始更新 —— ReactUpdates 
 
-我们看下enqueueUpdate在ReactUpdates端是如何实现的:
+我们看下enqueueUpdate在ReactUpdates中是如何实现的:
 
 ```javascript
 function enqueueUpdate(component) {
